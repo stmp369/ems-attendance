@@ -703,10 +703,11 @@
     getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, getDoc,
     serverTimestamp, query, where, getDocs, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-  // NOTE: firebase-auth is intentionally NOT imported here at page load.
-  // It's loaded on-demand (dynamic import) only when the admin clicks the
-  // "Migrate to Firebase Auth" button, so normal login on slow connections
-  // isn't slowed down by an extra ~150-200KB download nobody needs yet.
+  import {
+    getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  // firebase-auth is now imported at page load because every login goes
+  // through Firebase Authentication (see STEP 3 note near tryLogin below).
 
   const firebaseConfig = {
     apiKey: "AIzaSyAVXP_8-o_A2wEqUYPpL8-U0HtJKNMDvOs",
@@ -720,6 +721,7 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const auth = getAuth(app);
   const AUTH_EMAIL_DOMAIN = "@ems.local"; // fake email domain so usernames can work with Firebase Auth
   const empCol = collection(db, "employees");
   const attCol = collection(db, "attendance");
@@ -809,6 +811,11 @@
       if (btn) btn.click();
     }
   }
+  /* ============== STEP 3: real Firebase Auth login ==============
+     Password is now verified by Firebase Authentication itself (secure,
+     server-side) instead of comparing plaintext strings from Firestore.
+     The Firestore "users" doc is still used to look up role/active status,
+     since Firebase Auth accounts don't carry that custom data. */
   async function tryLogin() {
     const u = loginUser.value.trim();
     const p = loginPass.value;
@@ -818,19 +825,26 @@
     try {
       const snap = await getDoc(doc(db, "users", u));
       const acc = snap.exists() ? snap.data() : null;
-      if (acc && acc.active !== false && acc.password === p) {
-        sessionStorage.setItem("ems_user", u);
-        sessionStorage.setItem("ems_role", acc.role);
-        loginMsg.innerHTML = "";
-        showApp(u, acc.role);
-      } else if (acc && acc.active === false) {
-        loginMsg.innerHTML = `<div class="status-msg err">এই ইউজার নিষ্ক্রিয় করা আছে (This account is inactive)</div>`;
-      } else {
+      if (!acc) {
         loginMsg.innerHTML = `<div class="status-msg err">ভুল ইউজারনেম বা পাসওয়ার্ড (Invalid username or password)</div>`;
+        return;
       }
+      if (acc.active === false) {
+        loginMsg.innerHTML = `<div class="status-msg err">এই ইউজার নিষ্ক্রিয় করা আছে (This account is inactive)</div>`;
+        return;
+      }
+      await signInWithEmailAndPassword(auth, u + AUTH_EMAIL_DOMAIN, p);
+      sessionStorage.setItem("ems_user", u);
+      sessionStorage.setItem("ems_role", acc.role);
+      loginMsg.innerHTML = "";
+      showApp(u, acc.role);
     } catch (err) {
-      console.error(err);
-      loginMsg.innerHTML = `<div class="status-msg err">লগইন করতে সমস্যা হয়েছে: ${escapeHtml(err.message)}</div>`;
+      if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-email"].includes(err.code)) {
+        loginMsg.innerHTML = `<div class="status-msg err">ভুল ইউজারনেম বা পাসওয়ার্ড (Invalid username or password)</div>`;
+      } else {
+        console.error(err);
+        loginMsg.innerHTML = `<div class="status-msg err">লগইন করতে সমস্যা হয়েছে: ${escapeHtml(err.message)}</div>`;
+      }
     } finally {
       loginBtn.disabled = false;
     }
@@ -838,7 +852,8 @@
   document.getElementById("loginBtn").addEventListener("click", tryLogin);
   loginPass.addEventListener("keydown", (e) => { if (e.key === "Enter") tryLogin(); });
   loginUser.addEventListener("keydown", (e) => { if (e.key === "Enter") tryLogin(); });
-  document.getElementById("logoutBtn").addEventListener("click", () => {
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    try { await signOut(auth); } catch (e) { console.error(e); }
     sessionStorage.removeItem("ems_user");
     sessionStorage.removeItem("ems_role");
     document.body.classList.remove(...ALL_ROLE_CLASSES);
@@ -1641,9 +1656,13 @@
      Creates a Firebase Authentication account for every existing user doc,
      reusing their current plaintext password. Safe to click more than once:
      users already migrated (authMigrated: true) or that already have an
-     Auth account (auth/email-already-in-use) are skipped. This does NOT
-     change the login flow yet and does NOT delete the plaintext password —
-     that happens in a later step once the new login is confirmed working. */
+     Auth account (auth/email-already-in-use) are skipped.
+     NOTE: as of step 3, normal login (tryLogin) now verifies passwords via
+     Firebase Auth (signInWithEmailAndPassword), so any user must be migrated
+     here (or created fresh, which is auto-migrated) before they can log in.
+     Running this button while logged in signs the admin out of Firebase Auth
+     (see comment on signOut below) — the on-screen session stays open, but
+     log out/in again afterwards if you need a fresh authenticated session. */
   const migrateBtn = document.getElementById("migrateAuthBtn");
   const migrateStatus = document.getElementById("migrateStatus");
   if (migrateBtn) {
@@ -1651,14 +1670,9 @@
       if (currentRole !== "admin") return;
       if (!confirm("সব ইউজারের জন্য Firebase Auth অ্যাকাউন্ট তৈরি করা হবে। এগোতে চান?")) return;
       migrateBtn.disabled = true;
-      migrateStatus.textContent = "প্রয়োজনীয় ফাইল লোড হচ্ছে...";
+      migrateStatus.textContent = "মাইগ্রেশন চলছে...";
       let created = 0, skipped = 0, failed = 0;
       try {
-        const {
-          getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword
-        } = await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js");
-        const auth = getAuth(app);
-        migrateStatus.textContent = "মাইগ্রেশন চলছে...";
         const snap = await getDocs(usersCol);
         for (const d of snap.docs) {
           const u = d.data();
@@ -1680,7 +1694,7 @@
           }
         }
         // migration signs the browser in as the last-created user — sign back out
-        // so the admin's existing session (old login system) is unaffected.
+        // so it doesn't leave the wrong Firebase Auth account active.
         try { await signOut(auth); } catch (e) {}
         migrateStatus.innerHTML = `<span style="color:var(--green);">সম্পন্ন ✓</span> — নতুন তৈরি: ${created}, আগে থেকেই ছিল/স্কিপ: ${skipped}, ব্যর্থ: ${failed}`;
         renderUsersList();
