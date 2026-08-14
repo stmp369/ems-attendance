@@ -548,6 +548,15 @@
       <button class="btn-primary" id="migrateAuthBtn" style="background:linear-gradient(135deg, var(--gold), var(--gold-2));">🔐 Firebase Auth-এ মাইগ্রেট করুন</button>
     </div>
     <div id="migrateStatus" class="hint" style="margin:6px 2px 14px;"></div>
+    <div class="toolbar" style="background:var(--gold-soft); border-color:var(--gold-2);">
+      <div class="left">
+        <div class="hint" style="margin:0; color:var(--ink);">
+          <b>নিরাপত্তা মাইগ্রেশন (ধাপ ২ — cleanup):</b> ধাপ ১ সফল হলেই কেবল এই বাটন চাপুন। এটি Firestore-এর "users" কালেকশন থেকে পুরনো plaintext <code>password</code> ফিল্ডটি স্থায়ীভাবে মুছে দেবে — লগইন Firebase Auth দিয়েই হবে, তাই এই ফিল্ড আর দরকার নেই। যেসব ইউজারের <code>authMigrated: true</code> নেই, তাদের ফিল্ড সুরক্ষার জন্য বাদ রাখা হবে (আগে ধাপ ১ চালান)।
+        </div>
+      </div>
+      <button class="btn-primary" id="cleanupPasswordBtn" style="background:linear-gradient(135deg, var(--red), #b91c1c);">🧹 প্লেইনটেক্সট পাসওয়ার্ড মুছুন</button>
+    </div>
+    <div id="cleanupStatus" class="hint" style="margin:6px 2px 14px;"></div>
     <div class="toolbar">
       <div class="left">
         <div class="hint" style="margin:0;">প্রতিটি ইউজারের জন্য রোল ঠিক করুন: <b>admin</b> = সব এক্সেস, <b>viewer</b> = শুধু দেখা যাবে, <b>absentonly</b> = শুধু অনুপস্থিত তালিকা দেখা যাবে।</div>
@@ -577,9 +586,12 @@
           <label>ইউজারনেম (Username) *</label>
           <input type="text" id="u_username" required autocomplete="off" />
         </div>
-        <div class="field">
+        <div class="field" id="u_password_wrap">
           <label>পাসওয়ার্ড (Password) *</label>
-          <input type="text" id="u_password" required autocomplete="off" placeholder="পাসওয়ার্ড লিখুন" />
+          <input type="text" id="u_password" autocomplete="off" placeholder="পাসওয়ার্ড লিখুন" />
+        </div>
+        <div class="hint" id="u_password_edit_hint" style="display:none; margin:-4px 0 12px;">
+          নিরাপত্তার জন্য বিদ্যমান ইউজারের পাসওয়ার্ড এখান থেকে পরিবর্তন করা যায় না (আর Firestore-এ প্লেইনটেক্সটে রাখা হয় না)। পাসওয়ার্ড পরিবর্তনের প্রয়োজন হলে Firebase Console থেকে করুন, অথবা ইউজারকে মুছে নতুন করে তৈরি করুন।
         </div>
         <div class="field-row">
           <div class="field">
@@ -701,7 +713,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
     getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, getDoc,
-    serverTimestamp, query, where, getDocs, writeBatch
+    serverTimestamp, query, where, getDocs, writeBatch, updateDoc, deleteField
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import {
     getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword
@@ -743,19 +755,24 @@
      Users now live in the Firestore "users" collection (doc id = username) so an
      admin can add/edit/delete logins and change roles from the User Management tab. */
   /* No hardcoded default users/passwords here anymore — anyone can view this
-     file's source (Ctrl+U / F12), so any password written in this file is
-     effectively public. All accounts (including the first admin) must be
-     created directly in the Firestore "users" collection — see the
-     ADMIN SETUP note below for how to create the first admin account. */
+     file's source (Ctrl+U / F12). Login is verified by Firebase Auth, not by
+     any field in Firestore, so a Firestore "users" doc alone is never enough
+     to log in — it only supplies role/active status. To bootstrap the very
+     first admin (when both collections are empty): 1) Firebase Console >
+     Authentication > Add user, with email "<username>@ems.local" and a
+     password; 2) Firebase Console > Firestore > "users" collection, create a
+     doc with that same username as its ID and fields role: 'admin',
+     active: true, authMigrated: true — no password field needed. */
   async function seedUsersIfEmpty() {
     try {
       const snap = await getDocs(usersCol);
       if (snap.empty) {
         console.warn(
           "কোনো ইউজার পাওয়া যায়নি (No users found in Firestore). " +
-          "নিরাপত্তার জন্য এই ফাইলে আর কোনো ডিফল্ট পাসওয়ার্ড রাখা হয়নি। " +
-          "Firebase Console > Firestore > 'users' কালেকশনে গিয়ে ম্যানুয়ালি একটি " +
-          "admin ডকুমেন্ট তৈরি করুন, ফিল্ড: password (string), role: 'admin', active: true."
+          "প্রথম admin অ্যাকাউন্ট বানাতে: Firebase Console > Authentication-এ " +
+          "একটি ইউজার তৈরি করুন (email: <username>@ems.local), তারপর Firestore > " +
+          "'users' কালেকশনে একই username-এর ডকুমেন্ট বানান, ফিল্ড: role:'admin', " +
+          "active:true, authMigrated:true — password ফিল্ড লাগবে না।"
         );
       }
     } catch (err) { console.error("seedUsersIfEmpty failed:", err); }
@@ -1707,6 +1724,52 @@
     });
   }
 
+  /* ================= AUTH MIGRATION (admin only, step 2) =================
+     Removes the legacy plaintext `password` field from every Firestore
+     "users" doc. Only touches docs that already have authMigrated: true
+     (i.e. already have a working Firebase Auth account) — a user who was
+     never migrated would be locked out entirely if their password field
+     were deleted, since tryLogin's signInWithEmailAndPassword call would
+     have nothing to check. Safe to click more than once. */
+  const cleanupBtn = document.getElementById("cleanupPasswordBtn");
+  const cleanupStatus = document.getElementById("cleanupStatus");
+  if (cleanupBtn) {
+    cleanupBtn.addEventListener("click", async () => {
+      if (currentRole !== "admin") return;
+      if (!confirm("সব মাইগ্রেটেড ইউজারের plaintext পাসওয়ার্ড ফিল্ড স্থায়ীভাবে মুছে ফেলা হবে। এই কাজ ফিরিয়ে নেওয়া যাবে না। এগোতে চান?")) return;
+      cleanupBtn.disabled = true;
+      cleanupStatus.textContent = "মুছে ফেলা হচ্ছে...";
+      let removed = 0, skippedNotMigrated = 0, skippedNoField = 0, failed = 0;
+      try {
+        const snap = await getDocs(usersCol);
+        for (const d of snap.docs) {
+          const u = d.data();
+          const uname = d.id;
+          if (!("password" in u)) { skippedNoField++; continue; }
+          if (!u.authMigrated) { skippedNotMigrated++; continue; }
+          try {
+            await updateDoc(doc(db, "users", uname), { password: deleteField() });
+            removed++;
+          } catch (err) {
+            console.error("cleanup failed for", uname, err);
+            failed++;
+          }
+        }
+        let msg = `<span style="color:var(--green);">সম্পন্ন ✓</span> — মুছে ফেলা হয়েছে: ${removed}, আগে থেকেই ছিল না: ${skippedNoField}, ব্যর্থ: ${failed}`;
+        if (skippedNotMigrated > 0) {
+          msg += `<br><span style="color:var(--red);">⚠ ${skippedNotMigrated} জন ইউজার এখনো Firebase Auth-এ মাইগ্রেট হয়নি — তাদের ফিল্ড বাদ রাখা হয়েছে। প্রথমে উপরের "ধাপ ১" বাটন চাপুন, তারপর আবার এই বাটন চাপুন।</span>`;
+        }
+        cleanupStatus.innerHTML = msg;
+        renderUsersList();
+      } catch (err) {
+        console.error(err);
+        cleanupStatus.innerHTML = `<span style="color:var(--red);">সমস্যা হয়েছে: ${escapeHtml(err.message)}</span>`;
+      } finally {
+        cleanupBtn.disabled = false;
+      }
+    });
+  }
+
   /* ================= USER MANAGEMENT (admin only) ================= */
   const ROLE_LABELS = {
     admin: "admin — সব এক্সেস", viewer: "viewer — শুধু দেখা", absentonly: "absentonly — অনুপস্থিত তালিকা",
@@ -1772,9 +1835,11 @@
       userModalTitle.textContent = "ইউজার সম্পাদনা করুন";
       document.getElementById("u_username").value = u.username;
       document.getElementById("u_username").disabled = true;
-      document.getElementById("u_password").value = u.password || "";
+      document.getElementById("u_password").value = "";
       document.getElementById("u_role").value = u.role || "viewer";
       document.getElementById("u_active").value = (u.active !== false) ? "1" : "0";
+      document.getElementById("u_password_wrap").style.display = "none";
+      document.getElementById("u_password_edit_hint").style.display = "block";
     } else {
       editingUsername = null;
       userModalTitle.textContent = "নতুন ইউজার যোগ করুন";
@@ -1782,6 +1847,8 @@
       document.getElementById("u_username").disabled = false;
       document.getElementById("u_role").value = "viewer";
       document.getElementById("u_active").value = "1";
+      document.getElementById("u_password_wrap").style.display = "";
+      document.getElementById("u_password_edit_hint").style.display = "none";
     }
     userOverlay.classList.add("show");
   }
@@ -1797,26 +1864,54 @@
     const pass = document.getElementById("u_password").value;
     const role = document.getElementById("u_role").value;
     const active = document.getElementById("u_active").value === "1";
-    if (!uname || !pass) {
-      userFormMsg.innerHTML = `<div class="status-msg err">ইউজারনেম ও পাসওয়ার্ড আবশ্যক (Username and password required)</div>`;
-      return;
-    }
+
     if (!editingUsername) {
+      /* ---- Creating a brand-new user: a password is required, and it is
+         used ONLY to create the Firebase Auth account directly — it is
+         never written to Firestore, so there is no plaintext copy to clean
+         up later. */
+      if (!uname || !pass) {
+        userFormMsg.innerHTML = `<div class="status-msg err">ইউজারনেম ও পাসওয়ার্ড আবশ্যক (Username and password required)</div>`;
+        return;
+      }
       const existing = await getDoc(doc(db, "users", uname));
       if (existing.exists()) {
         userFormMsg.innerHTML = `<div class="status-msg err">এই ইউজারনেম আগে থেকেই আছে (Username already exists)</div>`;
         return;
       }
-    }
-    try {
-      await setDoc(doc(db, "users", uname), {
-        password: pass, role, active, updatedAt: serverTimestamp()
-      }, { merge: true });
-      closeUserModal();
-      renderUsersList();
-    } catch (err) {
-      console.error(err);
-      userFormMsg.innerHTML = `<div class="status-msg err">সংরক্ষণ করতে সমস্যা হয়েছে: ${escapeHtml(err.message)}</div>`;
+      try {
+        await createUserWithEmailAndPassword(auth, uname + AUTH_EMAIL_DOMAIN, pass);
+        await setDoc(doc(db, "users", uname), {
+          role, active, authMigrated: true, updatedAt: serverTimestamp()
+        }, { merge: true });
+        // creating the account signs the browser in as the new user in
+        // Firebase Auth (same quirk as the migration button) — sign back
+        // out so the admin's Firebase Auth session isn't hijacked.
+        try { await signOut(auth); } catch (e) {}
+        closeUserModal();
+        renderUsersList();
+      } catch (err) {
+        console.error(err);
+        const msg = err.code === "auth/email-already-in-use"
+          ? "এই ইউজারনেমের Firebase Auth অ্যাকাউন্ট আগে থেকেই আছে (Auth account already exists)"
+          : `সংরক্ষণ করতে সমস্যা হয়েছে: ${escapeHtml(err.message)}`;
+        userFormMsg.innerHTML = `<div class="status-msg err">${msg}</div>`;
+      }
+    } else {
+      /* ---- Editing an existing user: only role/active can change here.
+         Password is intentionally not touched — it already lives only in
+         Firebase Auth, not Firestore, so there's nothing to update. */
+      if (!uname) return;
+      try {
+        await setDoc(doc(db, "users", uname), {
+          role, active, updatedAt: serverTimestamp()
+        }, { merge: true });
+        closeUserModal();
+        renderUsersList();
+      } catch (err) {
+        console.error(err);
+        userFormMsg.innerHTML = `<div class="status-msg err">সংরক্ষণ করতে সমস্যা হয়েছে: ${escapeHtml(err.message)}</div>`;
+      }
     }
   });
 
