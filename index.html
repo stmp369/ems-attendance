@@ -270,6 +270,36 @@
   .btn-danger:hover{ background:#f0c9c3; }
   .btn-small{ padding:6px 12px; font-size:12.5px; border-radius:14px; }
 
+  /* ===== Mark All Attendance Once (single-tap bulk mark) ===== */
+  .mark-once-card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px 16px; box-shadow:var(--shadow); margin-bottom:14px; }
+  .moc-head{ font-size:13.5px; font-weight:700; color:var(--navy-2); margin-bottom:10px; }
+  .moc-body{ display:flex; flex-wrap:nowrap; gap:8px; }
+  .moc-btn{
+    flex:1 1 0; min-width:0; padding:14px 4px; font-size:15px; font-weight:800; border-radius:999px;
+    border:2px solid var(--line); background:#fff; color:var(--muted); letter-spacing:.02em;
+    transition: transform .12s ease, box-shadow .12s ease, background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .moc-btn:active{ transform:scale(.94); }
+  .moc-btn.moc-p{ border-color:var(--green); color:var(--green); }
+  .moc-btn.moc-a{ border-color:var(--red); color:var(--red); }
+  .moc-btn.moc-l{ border-color:var(--amber); color:var(--amber); }
+  .moc-btn.moc-lt{ border-color:#6a3aa3; color:#6a3aa3; }
+  .moc-btn.moc-w{ border-color:var(--blue); color:var(--blue); }
+  .moc-btn.moc-p.pulse{ background:var(--green); color:#fff; animation:mocPulse .5s ease; }
+  .moc-btn.moc-a.pulse{ background:var(--red); color:#fff; animation:mocPulse .5s ease; }
+  .moc-btn.moc-l.pulse{ background:var(--amber); color:#fff; animation:mocPulse .5s ease; }
+  .moc-btn.moc-lt.pulse{ background:#6a3aa3; color:#fff; animation:mocPulse .5s ease; }
+  .moc-btn.moc-w.pulse{ background:var(--blue); color:#fff; animation:mocPulse .5s ease; }
+  @keyframes mocPulse{
+    0%{ transform:scale(1); box-shadow:0 0 0 0 rgba(31,122,83,.35); }
+    35%{ transform:scale(1.14); box-shadow:0 0 0 8px rgba(31,122,83,0); }
+    100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(31,122,83,0); }
+  }
+
+  /* ===== Today attendance list: internal scroll, page stays fixed ===== */
+  .today-scroll-card{ max-height:60vh; overflow-y:auto; overflow-x:auto; }
+  .today-scroll-card thead th{ position:sticky; top:0; z-index:1; }
+
   /* ===== Bulk-action buttons (Mark All Present / Mark All Weekend) ===== */
   .bulk-actions{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }
   .btn-bulk{
@@ -449,6 +479,8 @@
     .field-row, .profile-grid{ grid-template-columns:1fr; }
     #viewModalFoot{ padding:12px 10px; gap:4px; }
     #viewModalFoot button{ padding:7px 4px; font-size:10.5px; border-radius:12px; }
+    .moc-btn{ padding:11px 2px; font-size:13px; }
+    .today-scroll-card{ max-height:50vh; }
   }
 
   /* ===== Mobile: sidebar becomes an off-canvas drawer ===== */
@@ -645,16 +677,16 @@
         <input type="date" id="todayDate" />
         <input type="text" id="todaySearch" placeholder="নাম বা আইডি খুঁজুন..." style="min-width:180px;" />
       </div>
-      <div class="bulk-actions">
-        <div id="todaySavingIndicator" class="hint"></div>
-        <button class="btn-bulk btn-bulk-present perm-mark" id="markAllPresentBtn">
-          <span class="bb-ic">✓</span>
-          <span class="bb-txt"><span class="bb-bn">সবাইকে উপস্থিত করুন</span><span class="bb-en">Mark All Present</span></span>
-        </button>
-        <button class="btn-bulk btn-bulk-weekend perm-mark" id="markAllWeekendBtn">
-          <span class="bb-ic">📅</span>
-          <span class="bb-txt"><span class="bb-bn">সবাইকে সাপ্তাহিক ছুটি করুন</span><span class="bb-en">Mark All Weekend</span></span>
-        </button>
+      <div class="mark-once-card perm-mark">
+        <div class="moc-head">Mark All Attendance Once</div>
+        <div class="moc-body">
+          <button class="moc-btn moc-p" data-mark-all="P" type="button">P</button>
+          <button class="moc-btn moc-a" data-mark-all="A" type="button">A</button>
+          <button class="moc-btn moc-l" data-mark-all="L" type="button">L</button>
+          <button class="moc-btn moc-lt" data-mark-all="LT" type="button">LT</button>
+          <button class="moc-btn moc-w" data-mark-all="W" type="button">W</button>
+        </div>
+        <div id="todaySavingIndicator" class="hint" style="margin-top:6px;"></div>
       </div>
     </div>
     <div class="stats">
@@ -671,7 +703,7 @@
         <tbody id="tDesigTable"></tbody></table>
       </div>
     </div>
-    <div class="table-card">
+    <div class="table-card today-scroll-card">
       <table>
         <thead><tr><th>আইডি</th><th>নাম</th><th>বিভাগ/পদবি</th><th>আজকের অবস্থা (Mark)</th></tr></thead>
         <tbody id="todayBody"></tbody>
@@ -1726,58 +1758,41 @@
   todayDateInput.addEventListener("change", loadTodayAttendance);
   todaySearch.addEventListener("input", renderToday);
 
-  document.getElementById("markAllPresentBtn").addEventListener("click", async () => {
-    if (!can("markAttendance")) return;
-    const date = todayDateInput.value;
-    const active = employees.filter(e => e.status !== "Inactive");
-    if (!active.length) return;
-    if (!confirm(`আপনি কি নিশ্চিত? ${active.length} জন সক্রিয় কর্মচারীকে ${date} তারিখে "Present" হিসেবে চিহ্নিত করা হবে।`)) return;
-    const indicator = document.getElementById("todaySavingIndicator");
-    indicator.textContent = "সংরক্ষণ হচ্ছে... (saving all)";
-    try {
-      const batch = writeBatch(db);
-      for (const e of active) {
-        const employeeId = e.employeeId;
-        batch.set(doc(db, "attendance", `${employeeId}_${date}`), {
-          employeeId, date, status: "P", updatedAt: serverTimestamp()
-        }, { merge: true });
-        todayAttMap[employeeId] = "P";
-      }
-      await batch.commit();
-      renderToday();
-      indicator.textContent = "সংরক্ষিত ✓ (all marked present)";
-      setTimeout(() => { indicator.textContent = ""; }, 2000);
-    } catch (err) {
-      console.error(err);
-      indicator.textContent = "ব্যর্থ (failed): " + err.message;
-    }
-  });
+  const STATUS_MSG = { P: "উপস্থিত (Present)", A: "অনুপস্থিত (Absent)", L: "ছুটি (Leave)", LT: "দেরি (Late)", W: "সাপ্তাহিক ছুটি (Weekend)" };
+  document.querySelectorAll("[data-mark-all]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!can("markAttendance")) return;
+      const status = btn.dataset.markAll;
+      btn.classList.remove("pulse");
+      void btn.offsetWidth; // restart animation if clicked repeatedly
+      btn.classList.add("pulse");
+      setTimeout(() => btn.classList.remove("pulse"), 550);
 
-  document.getElementById("markAllWeekendBtn").addEventListener("click", async () => {
-    if (!can("markAttendance")) return;
-    const date = todayDateInput.value;
-    const active = employees.filter(e => e.status !== "Inactive");
-    if (!active.length) return;
-    if (!confirm(`আপনি কি নিশ্চিত? ${active.length} জন সক্রিয় কর্মচারীকে ${date} তারিখে "সাপ্তাহিক ছুটি (Weekend)" হিসেবে চিহ্নিত করা হবে।`)) return;
-    const indicator = document.getElementById("todaySavingIndicator");
-    indicator.textContent = "সংরক্ষণ হচ্ছে... (saving all)";
-    try {
-      const batch = writeBatch(db);
-      for (const e of active) {
-        const employeeId = e.employeeId;
-        batch.set(doc(db, "attendance", `${employeeId}_${date}`), {
-          employeeId, date, status: "W", updatedAt: serverTimestamp()
-        }, { merge: true });
-        todayAttMap[employeeId] = "W";
+      const date = todayDateInput.value;
+      const active = employees.filter(e => e.status !== "Inactive");
+      if (!active.length) return;
+      const label = STATUS_MSG[status] || status;
+      if (!confirm(`আপনি কি নিশ্চিত? ${active.length} জন সক্রিয় কর্মচারীকে ${date} তারিখে "${label}" হিসেবে চিহ্নিত করা হবে।`)) return;
+      const indicator = document.getElementById("todaySavingIndicator");
+      indicator.textContent = "সংরক্ষণ হচ্ছে... (saving all)";
+      try {
+        const batch = writeBatch(db);
+        for (const e of active) {
+          const employeeId = e.employeeId;
+          batch.set(doc(db, "attendance", `${employeeId}_${date}`), {
+            employeeId, date, status, updatedAt: serverTimestamp()
+          }, { merge: true });
+          todayAttMap[employeeId] = status;
+        }
+        await batch.commit();
+        renderToday();
+        indicator.textContent = `সংরক্ষিত ✓ (all marked ${label})`;
+        setTimeout(() => { indicator.textContent = ""; }, 2000);
+      } catch (err) {
+        console.error(err);
+        indicator.textContent = "ব্যর্থ (failed): " + err.message;
       }
-      await batch.commit();
-      renderToday();
-      indicator.textContent = "সংরক্ষিত ✓ (all marked weekend)";
-      setTimeout(() => { indicator.textContent = ""; }, 2000);
-    } catch (err) {
-      console.error(err);
-      indicator.textContent = "ব্যর্থ (failed): " + err.message;
-    }
+    });
   });
 
   /* ================= DASHBOARD ================= */
