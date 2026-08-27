@@ -296,9 +296,42 @@
     100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(31,122,83,0); }
   }
 
-  /* ===== Today attendance list: internal scroll, page stays fixed ===== */
-  .table-card.today-scroll-card{ max-height:60vh; overflow-y:auto; overflow-x:auto; }
-  .today-scroll-card thead th{ position:sticky; top:0; z-index:1; }
+  /* ===== Internal scroll lists: table scrolls inside its card, page stays fixed ===== */
+  .table-card.today-scroll-card, .table-card.scroll-list-card{ max-height:60vh; overflow-y:auto; overflow-x:auto; }
+  .today-scroll-card thead th, .scroll-list-card thead th{ position:sticky; top:0; z-index:1; }
+
+  /* ===== Employee Search panel: bordered filter card ===== */
+  #panel-search .toolbar{
+    border:1.5px solid var(--navy-soft); border-radius:18px; padding:20px 20px 18px;
+    background:linear-gradient(180deg, #ffffff 0%, var(--navy-soft) 260%);
+    box-shadow:0 2px 4px rgba(31,122,83,.06), 0 14px 30px -18px rgba(31,122,83,.3);
+  }
+  #panel-search .toolbar .left{ gap:14px; align-items:flex-start; }
+  #panel-search .search-field{ display:flex; flex-direction:column; flex:1; min-width:200px; }
+  #panel-search .search-field .field-label{
+    font-size:11.5px; font-weight:700; color:var(--navy-2); margin-bottom:6px; letter-spacing:.02em;
+  }
+  #panel-search .search-field input, #panel-search .search-field select{
+    border:1.5px solid var(--line); border-radius:12px; padding:11px 13px;
+  }
+  #panel-search .search-field input:focus, #panel-search .search-field select:focus{
+    border-color:var(--navy-2); box-shadow:0 0 0 3px rgba(31,122,83,.12);
+  }
+  .lifetime-check{
+    display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--navy-2);
+    cursor:pointer; white-space:nowrap; padding:11px 14px; border:1.5px solid var(--line); border-radius:12px;
+    background:#fff; align-self:flex-end; margin-top:auto;
+  }
+  .lifetime-check:hover{ border-color:var(--navy-2); }
+  .lifetime-check input{ width:16px; height:16px; accent-color:var(--navy); flex-shrink:0; }
+  #empSearchExportWrap .btn-ghost{
+    display:inline-flex; align-items:center; gap:8px; border-radius:14px; border-width:1.5px;
+  }
+  @media (max-width:860px){
+    #panel-search .toolbar .left{ align-items:stretch; }
+    .lifetime-check{ align-self:stretch; justify-content:flex-start; }
+    #empSearchExportWrap .btn-ghost{ width:100%; justify-content:center; }
+  }
 
   /* ===== Bulk-action buttons (Mark All Present / Mark All Weekend) ===== */
   .bulk-actions{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }
@@ -480,7 +513,7 @@
     #viewModalFoot{ padding:12px 10px; gap:4px; }
     #viewModalFoot button{ padding:7px 4px; font-size:10.5px; border-radius:12px; }
     .moc-btn{ padding:11px 2px; font-size:13px; }
-    .today-scroll-card{ max-height:50vh; }
+    .today-scroll-card, .scroll-list-card{ max-height:50vh; }
   }
 
   /* ===== Mobile: sidebar becomes an off-canvas drawer ===== */
@@ -716,25 +749,37 @@
   <div class="panel" id="panel-search">
     <div class="toolbar">
       <div class="left">
-        <input type="text" id="empSearchBox" placeholder="আইডি বা নাম লিখুন / সিলেক্ট করুন..." style="min-width:260px;" list="empSearchList" />
-        <datalist id="empSearchList"></datalist>
-        <input type="month" id="empSearchMonth" />
-        <select id="empStatusFilter">
-          <option value="AL">অনুপস্থিত + ছুটি (Absent + Leave)</option>
-          <option value="A">শুধু অনুপস্থিত (Absent only)</option>
-          <option value="L">শুধু ছুটি (Leave only)</option>
-          <option value="LT">শুধু দেরি (Late only)</option>
-          <option value="P">শুধু উপস্থিত (Present only)</option>
-          <option value="W">শুধু সাপ্তাহিক ছুটি (Weekend only)</option>
-          <option value="ALL">সব দিন (All Days)</option>
-        </select>
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; white-space:nowrap;">
-          <input type="checkbox" id="empLifetimeToggle" style="width:16px; height:16px;" />
+        <div class="search-field" style="flex:2; min-width:240px;">
+          <span class="field-label">আইডি বা নাম (ID / Name)</span>
+          <input type="text" id="empSearchBox" placeholder="আইডি বা নাম লিখুন / সিলেক্ট করুন..." list="empSearchList" />
+          <datalist id="empSearchList"></datalist>
+        </div>
+        <div class="search-field" style="min-width:150px; flex:1;">
+          <span class="field-label">মাস (Month)</span>
+          <input type="month" id="empSearchMonth" />
+        </div>
+        <div class="search-field" style="min-width:210px; flex:1;">
+          <span class="field-label">ফিল্টার (Filter)</span>
+          <select id="empStatusFilter">
+            <option value="AL">অনুপস্থিত + ছুটি (Absent + Leave)</option>
+            <option value="A">শুধু অনুপস্থিত (Absent only)</option>
+            <option value="L">শুধু ছুটি (Leave only)</option>
+            <option value="LT">শুধু দেরি (Late only)</option>
+            <option value="P">শুধু উপস্থিত (Present only)</option>
+            <option value="W">শুধু সাপ্তাহিক ছুটি (Weekend only)</option>
+            <option value="ALL">সব দিন (All Days)</option>
+          </select>
+        </div>
+        <label class="lifetime-check">
+          <input type="checkbox" id="empLifetimeToggle" />
           লাইফটাইম (এ পর্যন্ত সব ডেটা)
         </label>
       </div>
     </div>
     <div id="empSearchResult"></div>
+    <div id="empSearchExportWrap" style="display:none; margin-top:14px; text-align:right;">
+      <button class="btn-ghost" id="empExportBtn" type="button">⬇️ হাজিরা রেকর্ড এক্সপোর্ট (Export Attendance Record)</button>
+    </div>
   </div>
 
   <!-- ================= DATE WISE ABSENT/LEAVE ================= -->
@@ -773,7 +818,7 @@
       <button class="btn-ghost" id="exportBtn" type="button">⬇️ এক্সপোর্ট (Export)</button>
       <button class="btn-primary perm-add" id="openAddBtn">+ কর্মচারী যোগ করুন</button>
     </div>
-    <div class="table-card">
+    <div class="table-card scroll-list-card" id="masterTableCard">
       <table class="master-table">
         <thead><tr><th>আইডি</th><th>নাম</th><th>বিভাগ/পদবি</th><th class="col-phone">মোবাইল</th><th class="col-blood">রক্তের গ্রুপ</th><th>অবস্থা</th><th>অ্যাকশন</th></tr></thead>
         <tbody id="tableBody"></tbody>
@@ -782,7 +827,7 @@
     </div>
     <details class="agr-milestone" id="inactiveSection" style="margin-top:16px;">
       <summary>নিষ্ক্রিয়/ডিএক্টিভেট করা কর্মচারী (Deactivated) <span id="inactiveCountLbl">(0)</span></summary>
-      <div class="table-card" style="margin-top:10px;">
+      <div class="table-card scroll-list-card" style="margin-top:10px;">
         <table class="master-table">
           <thead><tr><th>আইডি</th><th>নাম</th><th>বিভাগ/পদবি</th><th class="col-phone">মোবাইল</th><th class="col-blood">রক্তের গ্রুপ</th><th>অবস্থা</th><th>অ্যাকশন</th></tr></thead>
           <tbody id="inactiveTableBody"></tbody>
@@ -2080,6 +2125,7 @@
   // cache of the last fetched attendance, so switching the status
   // filter re-renders instantly without hitting Firestore again
   let empCache = { mode: null, ym: null, attByDate: {}, daysInMonth: 0, sortedDates: [] };
+  let currentSearchedEmp = null;
 
   function renderEmpDateList() {
     const card = document.getElementById("empDateListCard");
@@ -2131,11 +2177,18 @@
     const raw = empSearchBox.value.trim();
     const idPart = raw.split(" - ")[0].trim().toLowerCase();
     const resultEl = document.getElementById("empSearchResult");
-    if (!idPart) { resultEl.innerHTML = ""; return; }
+    if (!idPart) {
+      resultEl.innerHTML = "";
+      currentSearchedEmp = null;
+      document.getElementById("empSearchExportWrap").style.display = "none";
+      return;
+    }
     const emp = employees.find(e => (e.employeeId||"").toLowerCase() === idPart) ||
                 employees.find(e => (e.employeeId||"").toLowerCase().includes(idPart) || (e.fullName||"").toLowerCase().includes(idPart));
     if (!emp) {
       resultEl.innerHTML = `<div class="card"><div class="empty-state"><div class="big">🔍</div><div>কোনো কর্মচারী পাওয়া যায়নি।</div></div></div>`;
+      currentSearchedEmp = null;
+      document.getElementById("empSearchExportWrap").style.display = "none";
       return;
     }
 
@@ -2157,8 +2210,10 @@
         </div>
       </div>
       <div class="card" id="empMonthStatsCard"><h3>হাজিরা সারসংক্ষেপ (Attendance Summary)</h3>${statsHtml}</div>
-      <div class="table-card" id="empDateListCard" style="margin-top:16px;"></div>
+      <div class="table-card scroll-list-card" id="empDateListCard" style="margin-top:16px;"></div>
     `;
+    currentSearchedEmp = emp;
+    document.getElementById("empSearchExportWrap").style.display = "block";
 
     try {
       const qs = query(attCol, where("employeeId","==", emp.employeeId));
@@ -2214,8 +2269,62 @@
     }
   }
   empSearchBox.addEventListener("change", doEmpSearch);
-  empSearchBox.addEventListener("input", () => { if (!empSearchBox.value) document.getElementById("empSearchResult").innerHTML=""; });
+  empSearchBox.addEventListener("input", () => {
+    if (!empSearchBox.value) {
+      document.getElementById("empSearchResult").innerHTML = "";
+      currentSearchedEmp = null;
+      document.getElementById("empSearchExportWrap").style.display = "none";
+    }
+  });
   empSearchMonth.addEventListener("change", doEmpSearch);
+
+  /* ---- Export the currently displayed attendance record (respects active filter) ---- */
+  function exportEmpAttendanceRecord() {
+    if (!currentSearchedEmp || !empCache.mode) return;
+    const filter = empStatusFilter.value;
+    const matches = (s) => filter === "ALL" ? true : filter === "AL" ? (s === "A" || s === "L") : s === filter;
+    let rows = [];
+    if (empCache.mode === "lifetime") {
+      rows = empCache.sortedDates.filter(item => matches(item.s));
+    } else {
+      const [sy, sm] = empCache.ym.split("-").map(Number);
+      for (let day = 1; day <= empCache.daysInMonth; day++) {
+        const dateStr = empCache.ym + "-" + String(day).padStart(2,"0");
+        const s = empCache.attByDate[dateStr];
+        if (matches(s)) rows.push({ dateStr, s, dObj: new Date(sy, sm - 1, day) });
+      }
+    }
+    if (!rows.length) {
+      alert("এক্সপোর্ট করার মতো কোনো রেকর্ড পাওয়া যায়নি।");
+      return;
+    }
+    const exportRows = rows.map((item, i) => {
+      const dObj = item.dObj || new Date(item.dateStr + "T00:00:00");
+      const weekdayBn = dObj.toLocaleDateString("bn-BD", { weekday: "long" });
+      const label = item.s ? (STATUS_LABELS[item.s] || item.s) : "চিহ্নিত হয়নি (Unmarked)";
+      return {
+        "ক্রম": i + 1,
+        "Employee ID": currentSearchedEmp.employeeId,
+        "নাম": currentSearchedEmp.fullName,
+        "তারিখ": item.dateStr,
+        "বার": weekdayBn,
+        "অবস্থা": label
+      };
+    });
+    try {
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      ws["!cols"] = [{wch:6},{wch:14},{wch:22},{wch:14},{wch:14},{wch:26}];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+      const scopeTag = empCache.mode === "lifetime" ? "lifetime" : empCache.ym;
+      const dateStr = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `attendance_${currentSearchedEmp.employeeId}_${scopeTag}_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error(err);
+      alert("এক্সপোর্ট করতে সমস্যা হয়েছে: " + err.message);
+    }
+  }
+  document.getElementById("empExportBtn").addEventListener("click", exportEmpAttendanceRecord);
 
   /* ================= DATE WISE ABSENT/LEAVE ================= */
   const absentDateInput = document.getElementById("absentDate");
