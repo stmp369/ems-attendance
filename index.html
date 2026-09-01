@@ -291,20 +291,25 @@
   #panel-search .search-field input:focus, #panel-search .search-field select:focus{
     border-color:var(--navy-2); box-shadow:0 0 0 3px rgba(31,122,83,.12);
   }
-  .lifetime-check{
-    display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--navy-2);
-    cursor:pointer; white-space:nowrap; padding:11px 14px; border:1.5px solid var(--line); border-radius:12px;
-    background:#fff; align-self:flex-end; margin-top:auto;
+  #panel-search .search-field .lifetime-box input{
+    border:none; border-radius:0; padding:0; width:18px; height:18px; box-shadow:none;
   }
-  .lifetime-check:hover{ border-color:var(--navy-2); }
-  .lifetime-check input{ width:16px; height:16px; accent-color:var(--navy); flex-shrink:0; }
+  .lifetime-box{
+    display:flex; align-items:center; justify-content:center;
+    border:1.5px solid var(--line); border-radius:12px; background:#fff;
+    padding:11px 8px; cursor:pointer; box-sizing:border-box;
+  }
+  .lifetime-box:hover{ border-color:var(--navy-2); }
+  .lifetime-box input{ width:18px; height:18px; accent-color:var(--navy); flex-shrink:0; margin:0; }
   #empSearchExportWrap .btn-ghost{
     display:inline-flex; align-items:center; gap:8px; border-radius:14px; border-width:1.5px;
   }
   @media (max-width:860px){
     #panel-search .toolbar .left{ align-items:stretch; }
-    .lifetime-check{ align-self:stretch; justify-content:flex-start; }
     #empSearchExportWrap .btn-ghost{ width:100%; justify-content:center; }
+  }
+  @media (max-width:360px){
+    #panel-search .search-field .field-label{ font-size:10px; }
   }
 
   /* ===== Bulk-action buttons (Mark All Present / Mark All Weekend) ===== */
@@ -355,6 +360,34 @@
   .theme-swatch .ts-check{ margin-left:auto; opacity:0; color:var(--navy-2); }
   .theme-swatch.active .ts-check{ opacity:1; }
   @media (max-width:760px){ .settings-grid{ grid-template-columns:1fr; } }
+
+  /* ===== Employee Master: compact single-row stats table + non-wrapping toolbar rows ===== */
+  .stats-row{ display:grid; grid-template-columns:repeat(4, 1fr); background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:16px; }
+  .stats-row .stat-col{ padding:12px 6px; text-align:center; border-right:1px solid var(--line);
+    display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .stats-row .stat-col:last-child{ border-right:none; }
+  .stats-row .stat-col .num{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:19px; color:var(--navy);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stats-row .stat-col.warn .num{ color:var(--red); }
+  .stats-row .stat-col.ok .num{ color:var(--green); }
+  .stats-row .stat-col .lbl{ font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  @media (max-width:480px){
+    .stats-row .stat-col{ padding:9px 2px; }
+    .stats-row .stat-col .num{ font-size:14.5px; }
+    .stats-row .stat-col .lbl{ font-size:9px; }
+  }
+
+  #panel-master .toolbar{ flex-direction:column; align-items:stretch; }
+  .ms-search-row{ display:flex; flex-wrap:nowrap; gap:8px; width:100%; }
+  .ms-search-row input{ flex:1 1 auto; min-width:0; }
+  .ms-search-row button{ flex:0 0 auto; white-space:nowrap; }
+  .ms-action-row{ display:flex; flex-wrap:nowrap; gap:8px; width:100%; }
+  .ms-action-row button{ flex:1 1 0; min-width:0; white-space:nowrap; text-align:center; justify-content:center; }
+  @media (max-width:400px){
+    .ms-search-row button{ padding:9px 12px; font-size:12.5px; }
+    .ms-action-row button{ padding:9px 6px; font-size:12px; }
+  }
   .emp-id{ font-family:'JetBrains Mono',monospace; color:var(--muted); font-size:12.5px; }
   .name-cell{ font-weight:600; }
   .badge{ display:inline-block; font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:20px; }
@@ -674,11 +707,15 @@
   <!-- ================= TODAY ATTENDANCE ================= -->
   <div class="panel" id="panel-today">
     <div class="toolbar">
-      <div class="left">
-        <label class="hint" style="margin:0;">Date:</label>
-        <input type="date" id="todayDate" />
-        <input type="text" id="todaySearch" placeholder="Search by name or ID..." style="min-width:180px;" />
-        <button type="button" id="todaySearchBtn" class="btn-search">🔎 Search</button>
+      <div class="left" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <label class="hint" style="margin:0;">Date:</label>
+          <input type="date" id="todayDate" />
+        </div>
+        <div class="ms-search-row">
+          <input type="text" id="todaySearch" placeholder="Search by name or ID..." />
+          <button type="button" id="todaySearchBtn" class="btn-search">🔎 Search</button>
+        </div>
       </div>
       <div class="mark-once-card perm-mark">
         <div class="moc-head">Mark All Attendance Once</div>
@@ -692,12 +729,12 @@
         <div id="todaySavingIndicator" class="hint" style="margin-top:6px;"></div>
       </div>
     </div>
-    <div class="stats">
-      <div class="stat"><div class="num" id="tTotal">0</div><div class="lbl">Total (Total Manpower)</div></div>
-      <div class="stat ok"><div class="num" id="tPresent">0</div><div class="lbl">Present</div></div>
-      <div class="stat warn"><div class="num" id="tAbsent">0</div><div class="lbl">Absent</div></div>
-      <div class="stat"><div class="num" id="tLeave">0</div><div class="lbl">Leave</div></div>
-      <div class="stat"><div class="num" id="tUnmarked">0</div><div class="lbl">Unmarked</div></div>
+    <div class="stats-row" style="grid-template-columns:repeat(5, 1fr);">
+      <div class="stat-col"><div class="num" id="tTotal">0</div><div class="lbl">Total</div></div>
+      <div class="stat-col ok"><div class="num" id="tPresent">0</div><div class="lbl">Present</div></div>
+      <div class="stat-col warn"><div class="num" id="tAbsent">0</div><div class="lbl">Absent</div></div>
+      <div class="stat-col"><div class="num" id="tLeave">0</div><div class="lbl">Leave</div></div>
+      <div class="stat-col"><div class="num" id="tUnmarked">0</div><div class="lbl">Unmarked</div></div>
     </div>
     <div class="card">
       <h3>Today's by Designation Absent/Leave (By Designation)</h3>
@@ -718,8 +755,32 @@
   <!-- ================= EMPLOYEE SEARCH ================= -->
   <div class="panel" id="panel-search">
     <div class="toolbar">
-      <div class="left">
-        <div class="search-field" style="flex:2; min-width:240px;">
+      <div class="left" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; gap:10px; flex-wrap:nowrap; width:100%;">
+          <div class="search-field" style="flex:1; min-width:0;">
+            <span class="field-label">Month</span>
+            <input type="month" id="empSearchMonth" />
+          </div>
+          <div class="search-field" style="flex:1; min-width:0;">
+            <span class="field-label">Filter</span>
+            <select id="empStatusFilter">
+              <option value="AL">Absent + Leave (Absent + Leave)</option>
+              <option value="A">Absent only</option>
+              <option value="L">Leave only</option>
+              <option value="LT">Late only</option>
+              <option value="P">Present only</option>
+              <option value="W">Weekend only</option>
+              <option value="ALL">All Days</option>
+            </select>
+          </div>
+          <div class="search-field" style="flex:0 0 78px; min-width:0;">
+            <span class="field-label" style="text-align:center;">Lifetime</span>
+            <label class="lifetime-box">
+              <input type="checkbox" id="empLifetimeToggle" />
+            </label>
+          </div>
+        </div>
+        <div class="search-field" style="width:100%; min-width:0;">
           <span class="field-label">ID / Name</span>
           <div style="display:flex; gap:8px;">
             <input type="text" id="empSearchBox" placeholder="Type or select ID or name..." list="empSearchList" style="flex:1; min-width:0;" />
@@ -727,26 +788,6 @@
           </div>
           <datalist id="empSearchList"></datalist>
         </div>
-        <div class="search-field" style="min-width:150px; flex:1;">
-          <span class="field-label">Month</span>
-          <input type="month" id="empSearchMonth" />
-        </div>
-        <div class="search-field" style="min-width:210px; flex:1;">
-          <span class="field-label">Filter</span>
-          <select id="empStatusFilter">
-            <option value="AL">Absent + Leave (Absent + Leave)</option>
-            <option value="A">Absent only</option>
-            <option value="L">Leave only</option>
-            <option value="LT">Late only</option>
-            <option value="P">Present only</option>
-            <option value="W">Weekend only</option>
-            <option value="ALL">All Days</option>
-          </select>
-        </div>
-        <label class="lifetime-check">
-          <input type="checkbox" id="empLifetimeToggle" />
-          Lifetime (all data so far)
-        </label>
       </div>
     </div>
     <div id="empSearchResult"></div>
@@ -763,9 +804,9 @@
         <input type="date" id="absentDate" />
       </div>
     </div>
-    <div class="stats">
-      <div class="stat warn"><div class="num" id="alAbsent">0</div><div class="lbl">Total Absent</div></div>
-      <div class="stat"><div class="num" id="alLeave">0</div><div class="lbl">Total Leave</div></div>
+    <div class="stats-row" style="grid-template-columns:repeat(2, 1fr);">
+      <div class="stat-col warn"><div class="num" id="alAbsent">0</div><div class="lbl">Total Absent</div></div>
+      <div class="stat-col"><div class="num" id="alLeave">0</div><div class="lbl">Total Leave</div></div>
     </div>
     <div class="table-card">
       <table>
@@ -778,19 +819,21 @@
 
   <!-- ================= EMPLOYEE MASTER ================= -->
   <div class="panel" id="panel-master">
-    <div class="stats">
-      <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">Total</div></div>
-      <div class="stat ok"><div class="num" id="statActive">0</div><div class="lbl">Active</div></div>
-      <div class="stat warn"><div class="num" id="statInactive">0</div><div class="lbl">Inactive</div></div>
-      <div class="stat"><div class="num" id="statDept">0</div><div class="lbl">Department (Departments)</div></div>
+    <div class="stats-row">
+      <div class="stat-col"><div class="num" id="statTotal">0</div><div class="lbl">Total</div></div>
+      <div class="stat-col ok"><div class="num" id="statActive">0</div><div class="lbl">Active</div></div>
+      <div class="stat-col warn"><div class="num" id="statInactive">0</div><div class="lbl">Inactive</div></div>
+      <div class="stat-col"><div class="num" id="statDept">0</div><div class="lbl">Department</div></div>
     </div>
     <div class="toolbar">
-      <div class="left">
-        <input type="text" id="searchInput" placeholder="Search by ID, name, or department..." style="min-width:180px;" />
+      <div class="ms-search-row">
+        <input type="text" id="searchInput" placeholder="Search by ID, name, or department..." />
         <button type="button" id="searchInputBtn" class="btn-search">🔎 Search</button>
       </div>
-      <button class="btn-ghost" id="exportBtn" type="button">⬇️ Export</button>
-      <button class="btn-primary perm-add" id="openAddBtn">+ Add Employee</button>
+      <div class="ms-action-row">
+        <button class="btn-ghost" id="exportBtn" type="button">⬇️ Export</button>
+        <button class="btn-primary perm-add" id="openAddBtn" type="button">+ Add Employee</button>
+      </div>
     </div>
     <div class="table-card scroll-list-card" id="masterTableCard">
       <table class="master-table">
