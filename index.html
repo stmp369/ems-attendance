@@ -1422,8 +1422,19 @@
            (e.g. it was deleted in the console after a password reset),
            create one now using the password already verified against
            Firestore above, instead of requiring a separate admin step. */
-        if (signInErr.code === "auth/user-not-found") {
-          await createUserWithEmailAndPassword(auth, u + AUTH_EMAIL_DOMAIN, p);
+        if (signInErr.code === "auth/user-not-found" || signInErr.code === "auth/invalid-credential") {
+          try {
+            await createUserWithEmailAndPassword(auth, u + AUTH_EMAIL_DOMAIN, p);
+          } catch (createErr) {
+            /* Account already exists (e.g. Firestore password was changed
+               after migration without updating Firebase Auth) — the original
+               sign-in failure was a real wrong-password case, not a missing
+               account, so surface that instead. */
+            if (createErr.code === "auth/email-already-in-use") {
+              throw signInErr;
+            }
+            throw createErr;
+          }
         } else {
           throw signInErr;
         }
